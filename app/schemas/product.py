@@ -23,6 +23,12 @@ class ProductBase(BaseModel):
     )
 
     images: str | None = None
+    category: str | None = None
+
+    popularity: int = Field(
+    default=0,
+    ge=0
+)
 
 
 # ============================================================
@@ -58,6 +64,13 @@ class ProductUpdate(BaseModel):
     )
 
     images: str | None = None
+
+    category: str | None = None
+
+    popularity: int | None = Field(
+    default=None,
+    ge=0
+)
 
 
 # ============================================================

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field # type: ignore
+from pydantic import BaseModel, Field  # type: ignore
 
 
 # ============================================================
@@ -34,8 +34,11 @@ class CartUpdate(BaseModel):
 class CartProductResponse(BaseModel):
 
     id: int
+
     name: str
+
     price: float
+
     images: str | None = None
 
 
@@ -46,6 +49,22 @@ class CartProductResponse(BaseModel):
 class CartResponse(BaseModel):
 
     id: int
+
     product_id: int
+
     quantity: int
+
+    item_total: float
+
     product: CartProductResponse
+
+
+# ============================================================
+# CART TOTAL RESPONSE
+# ============================================================
+
+class CartTotalResponse(BaseModel):
+
+    items: list[CartResponse]
+
+    cart_total: float

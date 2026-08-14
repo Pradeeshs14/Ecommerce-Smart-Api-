@@ -44,6 +44,17 @@ class Product(Base):
         nullable=True
     )
 
+    category = Column(
+    String(100),
+    nullable=True
+    )
+
+    popularity = Column(
+    Integer,
+    nullable=False,
+    default=0
+    )
+
     cart_items = relationship(
         "Cart",
         back_populates="product",

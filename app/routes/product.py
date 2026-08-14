@@ -41,7 +41,9 @@ def create_product(
         description=product_data.description,
         price=product_data.price,
         stock=product_data.stock,
-        images=product_data.images
+        images=product_data.images,
+        category=product_data.category,
+        popularity=product_data.popularity
     )
 
     db.add(new_product)
@@ -52,7 +54,7 @@ def create_product(
 
 
 # ============================================================
-# GET ALL PRODUCTS
+# GET ALL PRODUCTS + FILTERS
 # ============================================================
 
 @router.get(
@@ -60,10 +62,72 @@ def create_product(
     response_model=list[ProductResponse]
 )
 def get_products(
+    category: str | None = None,
+    price_min: float | None = None,
+    price_max: float | None = None,
+    popularity: int | None = None,
+    in_stock: bool | None = None,
     db: Session = Depends(get_db)
 ):
 
-    products = db.query(Product).all()
+    query = db.query(Product)
+
+    # Category filter
+    if category:
+        query = query.filter(
+            Product.category == category
+        )
+
+    # Minimum price filter
+    if price_min is not None:
+        query = query.filter(
+            Product.price >= price_min
+        )
+
+    # Maximum price filter
+    if price_max is not None:
+        query = query.filter(
+            Product.price <= price_max
+        )
+
+    # Popularity filter
+    if popularity is not None:
+        query = query.filter(
+            Product.popularity >= popularity
+        )
+
+    # Stock availability filter
+    if in_stock is True:
+        query = query.filter(
+            Product.stock > 0
+        )
+
+    if in_stock is False:
+        query = query.filter(
+            Product.stock == 0
+        )
+
+    return query.all()
+
+
+# ============================================================
+# GET PRODUCTS BY CATEGORY
+# ============================================================
+
+@router.get(
+    "/category/{category}",
+    response_model=list[ProductResponse]
+)
+def get_products_by_category(
+    category: str,
+    db: Session = Depends(get_db)
+):
+
+    products = (
+        db.query(Product)
+        .filter(Product.category == category)
+        .all()
+    )
 
     return products
 

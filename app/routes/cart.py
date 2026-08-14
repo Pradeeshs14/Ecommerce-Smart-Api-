@@ -8,7 +8,8 @@ from app.models.product import Product
 from app.schemas.cart import (
     CartCreate,
     CartUpdate,
-    CartResponse
+    CartResponse,
+    CartTotalResponse
 )
 
 
@@ -82,6 +83,10 @@ def add_to_cart(
         db.commit()
         db.refresh(existing_cart)
 
+        existing_cart.item_total = (
+            product.price * existing_cart.quantity
+        )
+
         return existing_cart
 
     new_cart = Cart(
@@ -94,15 +99,24 @@ def add_to_cart(
     db.commit()
     db.refresh(new_cart)
 
+    new_cart.item_total = (
+        product.price * new_cart.quantity
+    )
+
     return new_cart
 
-    # ============================================================
+
+# ============================================================
+# GET CUSTOMER CART
+# ============================================================
+
+# ============================================================
 # GET CUSTOMER CART
 # ============================================================
 
 @router.get(
     "/",
-    response_model=list[CartResponse]
+    response_model=CartTotalResponse
 )
 def get_cart(
     db: Session = Depends(get_db),
@@ -117,9 +131,23 @@ def get_cart(
         .all()
     )
 
-    return cart_items
+    cart_total = 0.0
 
-   # ============================================================
+    for item in cart_items:
+
+        item.item_total = (
+            item.product.price * item.quantity
+        )
+
+        cart_total += item.item_total
+
+    return {
+        "items": cart_items,
+        "cart_total": cart_total
+    }
+
+
+# ============================================================
 # UPDATE CART QUANTITY
 # ============================================================
 
@@ -174,9 +202,14 @@ def update_cart(
     db.commit()
     db.refresh(cart_item)
 
+    cart_item.item_total = (
+        product.price * cart_item.quantity
+    )
+
     return cart_item
 
-    # ============================================================
+
+# ============================================================
 # DELETE CART ITEM
 # ============================================================
 
