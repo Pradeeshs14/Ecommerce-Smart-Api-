@@ -1,25 +1,39 @@
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status  # type: ignore
+
+from fastapi import ( # type: ignore
+    APIRouter,
+    Depends,
+    HTTPException,
+    status,
+)
+
 from sqlalchemy.orm import Session  # type: ignore
+
 import stripe  # type: ignore
 
 from app.core.config import STRIPE_SECRET_KEY
 from app.core.database import get_db
 from app.core.security import (
     get_current_user,
-    require_role
+    require_role,
 )
+from app.core.email import send_email
 
 from app.models.cart import Cart
 from app.models.order import Order
 from app.models.order_item import OrderItem
 from app.models.payment import Payment
 from app.models.product import Product
+from app.models.notification import Notification
+from app.models.user import User
 
 from app.schemas.order import (
     CheckoutResponse,
-    OrderResponse
+    OrderResponse,
+    OrderStatusUpdate,
 )
+
+from app.services.websocket_manager import manager
 
 
 # ============================================================
@@ -28,8 +42,15 @@ from app.schemas.order import (
 
 stripe.api_key = STRIPE_SECRET_KEY
 
-print("STRIPE KEY PREFIX:", STRIPE_SECRET_KEY[:8])
-print("STRIPE KEY LENGTH:", len(STRIPE_SECRET_KEY))
+print(
+    "STRIPE KEY PREFIX:",
+    STRIPE_SECRET_KEY[:8]
+)
+
+print(
+    "STRIPE KEY LENGTH:",
+    len(STRIPE_SECRET_KEY)
+)
 
 
 # ============================================================
@@ -52,7 +73,7 @@ router = APIRouter(
 )
 def get_customer_orders(
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
 
     user_id = int(current_user)
@@ -82,7 +103,7 @@ def get_customer_orders(
 )
 def checkout(
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
 
     user_id = int(current_user)
@@ -92,6 +113,7 @@ def checkout(
     # ========================================================
 
     if not STRIPE_SECRET_KEY:
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Stripe is not configured"
@@ -110,6 +132,7 @@ def checkout(
     )
 
     if not cart_items:
+
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cart is empty"
@@ -133,19 +156,25 @@ def checkout(
         )
 
         if not product:
+
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Product not found"
             )
 
         if product.stock < cart_item.quantity:
+
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Insufficient stock for {product.name}"
+                detail=(
+                    f"Insufficient stock for "
+                    f"{product.name}"
+                )
             )
 
         total_amount += (
-            product.price * cart_item.quantity
+            product.price *
+            cart_item.quantity
         )
 
         products.append(
@@ -204,8 +233,11 @@ def checkout(
         # ----------------------------------------------------
 
         payment_intent = stripe.PaymentIntent.create(
+
             amount=amount_in_cents,
+
             currency="inr",
+
             metadata={
                 "order_id": str(new_order.id),
                 "user_id": str(user_id)
@@ -217,6 +249,7 @@ def checkout(
         # ----------------------------------------------------
 
         checkout_session = stripe.checkout.Session.create(
+
             mode="payment",
 
             payment_method_types=[
@@ -226,13 +259,17 @@ def checkout(
             line_items=[
                 {
                     "price_data": {
+
                         "currency": "inr",
 
                         "product_data": {
-                            "name": f"Order #{new_order.id}"
+                            "name": (
+                                f"Order #{new_order.id}"
+                            )
                         },
 
-                        "unit_amount": amount_in_cents
+                        "unit_amount":
+                            amount_in_cents
                     },
 
                     "quantity": 1
@@ -245,12 +282,15 @@ def checkout(
             },
 
             success_url=(
-                "http://localhost:3000/payment/success"
-                "?session_id={CHECKOUT_SESSION_ID}"
+                "http://localhost:3000/"
+                "payment/success"
+                "?session_id="
+                "{CHECKOUT_SESSION_ID}"
             ),
 
             cancel_url=(
-                "http://localhost:3000/payment/cancel"
+                "http://localhost:3000/"
+                "payment/cancel"
             )
         )
 
@@ -260,7 +300,10 @@ def checkout(
 
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Stripe payment creation failed: {str(exc)}"
+            detail=(
+                "Stripe payment creation failed: "
+                f"{str(exc)}"
+            )
         )
 
     except Exception as exc:
@@ -269,7 +312,10 @@ def checkout(
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Payment setup failed: {str(exc)}"
+            detail=(
+                "Payment setup failed: "
+                f"{str(exc)}"
+            )
         )
 
     # ========================================================
@@ -277,15 +323,15 @@ def checkout(
     # ========================================================
 
     payment = Payment(
-    order_id=new_order.id,
-    amount=total_amount,
-    payment_method="card",
-    transaction_id=payment_intent.id,
-    status="pending",
-    timestamp=datetime.utcnow(),
-    payment_intent_id=payment_intent.id,
-    checkout_session_id=checkout_session.id
-)
+        order_id=new_order.id,
+        amount=total_amount,
+        payment_method="card",
+        transaction_id=payment_intent.id,
+        status="pending",
+        timestamp=datetime.utcnow(),
+        payment_intent_id=payment_intent.id,
+        checkout_session_id=checkout_session.id
+    )
 
     db.add(payment)
 
@@ -311,7 +357,10 @@ def checkout(
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Order creation failed: {str(exc)}"
+            detail=(
+                "Order creation failed: "
+                f"{str(exc)}"
+            )
         )
 
     db.refresh(new_order)
@@ -321,11 +370,17 @@ def checkout(
     # ========================================================
 
     return CheckoutResponse(
+
         order_id=new_order.id,
+
         total_amount=new_order.total_amount,
+
         payment_status=new_order.payment_status,
+
         payment_intent_id=payment_intent.id,
+
         checkout_session_id=checkout_session.id,
+
         checkout_url=checkout_session.url
     )
 
@@ -340,7 +395,9 @@ def checkout(
 )
 def get_all_orders(
     db: Session = Depends(get_db),
-    current_user=Depends(require_role("admin"))
+    current_user=Depends(
+        require_role("admin")
+    ),
 ):
 
     orders = (
@@ -352,3 +409,258 @@ def get_all_orders(
     )
 
     return orders
+
+
+# ============================================================
+# ADMIN - UPDATE ORDER STATUS
+# ============================================================
+
+@router.put(
+    "/admin/{order_id}/status",
+    response_model=OrderResponse
+)
+async def update_order_status(
+    order_id: int,
+    status_data: OrderStatusUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(
+        require_role("admin")
+    ),
+):
+
+    # ========================================================
+    # VALID STATUSES
+    # ========================================================
+
+    allowed_statuses = {
+        "pending",
+        "confirmed",
+        "shipped",
+        "delivered",
+        "cancelled",
+    }
+
+    new_status = (
+        status_data.status
+        .lower()
+        .strip()
+    )
+
+    if new_status not in allowed_statuses:
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Invalid order status. "
+                "Allowed values: "
+                "pending, confirmed, shipped, "
+                "delivered, cancelled"
+            )
+        )
+
+    # ========================================================
+    # FIND ORDER
+    # ========================================================
+
+    order = (
+        db.query(Order)
+        .filter(
+            Order.id == order_id
+        )
+        .first()
+    )
+
+    if not order:
+
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order not found"
+        )
+
+    # ========================================================
+    # CHECK SAME STATUS
+    # ========================================================
+
+    if order.status == new_status:
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Order is already "
+                f"{new_status}"
+            )
+        )
+
+    # ========================================================
+    # SAVE OLD STATUS
+    # ========================================================
+
+    old_status = order.status
+
+    # ========================================================
+    # UPDATE ORDER STATUS
+    # ========================================================
+
+    order.status = new_status
+
+    # ========================================================
+    # CREATE NOTIFICATION
+    # ========================================================
+
+    notification = Notification(
+
+        user_id=order.user_id,
+
+        type="order_status_updated",
+
+        message=(
+            f"Your Order #{order.id} "
+            f"status has been updated "
+            f"to {new_status}"
+        ),
+
+        read_status="unread"
+    )
+
+    db.add(notification)
+
+    # ========================================================
+    # COMMIT DATABASE
+    # ========================================================
+
+    try:
+
+        db.commit()
+
+        db.refresh(order)
+
+    except Exception as exc:
+
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Failed to update order status: "
+                f"{str(exc)}"
+            )
+        )
+
+    # ========================================================
+    # WEBSOCKET NOTIFICATION
+    # ========================================================
+
+    try:
+
+        await manager.send_to_user(
+
+            order.user_id,
+
+            {
+                "event":
+                    "order_status_updated",
+
+                "order_id":
+                    order.id,
+
+                "old_status":
+                    old_status,
+
+                "status":
+                    new_status,
+
+                "payment_status":
+                    order.payment_status,
+
+                "message":
+                    (
+                        f"Your Order #{order.id} "
+                        f"has been updated to "
+                        f"{new_status}"
+                    )
+            }
+        )
+
+        print(
+            "Real-time order status "
+            "notification sent"
+        )
+
+    except Exception as websocket_exc:
+
+        print(
+            "WEBSOCKET ORDER STATUS ERROR:",
+            repr(websocket_exc)
+        )
+
+    # ========================================================
+    # SEND EMAIL
+    # ========================================================
+
+    try:
+
+        user = (
+            db.query(User)
+            .filter(
+                User.id == order.user_id
+            )
+            .first()
+        )
+
+        if user:
+
+            email_subject = (
+                f"Order #{order.id} "
+                f"Status Updated - "
+                f"Smart E-Commerce"
+            )
+
+            email_body = f"""
+Hello {user.name},
+
+Your order status has been updated.
+
+Order Details
+------------------------------
+
+Order ID: #{order.id}
+
+Previous Status: {old_status}
+
+Current Status: {new_status}
+
+Payment Status: {order.payment_status}
+
+Thank you for shopping with
+Smart E-Commerce.
+
+Regards,
+
+Smart E-Commerce Team
+"""
+
+            await send_email(
+                recipient=user.email,
+                subject=email_subject,
+                body=email_body
+            )
+
+            print(
+                "Order status email sent successfully"
+            )
+
+    except Exception as email_exc:
+
+        print(
+            "ORDER STATUS EMAIL ERROR:",
+            repr(email_exc)
+        )
+
+        # Email failure should not
+        # fail the order update.
+
+    # ========================================================
+    # RETURN UPDATED ORDER
+    # ========================================================
+
+    return order

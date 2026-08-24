@@ -56,3 +56,59 @@ STRIPE_WEBHOOK_SECRET = os.getenv(
     "STRIPE_WEBHOOK_SECRET",
     ""
 )
+
+# ============================================================
+# EMAIL CONFIGURATION
+# ============================================================
+
+MAIL_USERNAME = os.getenv(
+    "MAIL_USERNAME",
+    ""
+)
+
+MAIL_PASSWORD = os.getenv(
+    "MAIL_PASSWORD",
+    ""
+)
+
+MAIL_FROM = os.getenv(
+    "MAIL_FROM",
+    ""
+)
+
+MAIL_PORT = int(
+    os.getenv(
+        "MAIL_PORT",
+        "587"
+    )
+)
+
+MAIL_SERVER = os.getenv(
+    "MAIL_SERVER",
+    "smtp.gmail.com"
+)
+
+MAIL_FROM_NAME = os.getenv(
+    "MAIL_FROM_NAME",
+    "Smart E-Commerce"
+)
+
+MAIL_STARTTLS = os.getenv(
+    "MAIL_STARTTLS",
+    "True"
+).lower() == "true"
+
+MAIL_SSL_TLS = os.getenv(
+    "MAIL_SSL_TLS",
+    "False"
+).lower() == "true"
+
+MAIL_USE_CREDENTIALS = os.getenv(
+    "MAIL_USE_CREDENTIALS",
+    "True"
+).lower() == "true"
+
+MAIL_VALIDATE_CERTS = os.getenv(
+    "MAIL_VALIDATE_CERTS",
+    "True"
+).lower() == "true"

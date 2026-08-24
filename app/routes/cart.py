@@ -3,8 +3,11 @@ from sqlalchemy.orm import Session  # type: ignore
 
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.services.websocket_manager import manager
+
 from app.models.cart import Cart
 from app.models.product import Product
+
 from app.schemas.cart import (
     CartCreate,
     CartUpdate,
@@ -32,11 +35,17 @@ router = APIRouter(
     response_model=CartResponse,
     status_code=status.HTTP_201_CREATED
 )
-def add_to_cart(
+async def add_to_cart(
     cart_data: CartCreate,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
+
+    user_id = int(current_user)
+
+    # ========================================================
+    # FIND PRODUCT
+    # ========================================================
 
     product = (
         db.query(Product)
@@ -50,20 +59,32 @@ def add_to_cart(
             detail="Product not found"
         )
 
+    # ========================================================
+    # CHECK STOCK
+    # ========================================================
+
     if product.stock < cart_data.quantity:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Insufficient stock"
         )
 
+    # ========================================================
+    # CHECK EXISTING CART ITEM
+    # ========================================================
+
     existing_cart = (
         db.query(Cart)
         .filter(
-            Cart.user_id == int(current_user),
+            Cart.user_id == user_id,
             Cart.product_id == cart_data.product_id
         )
         .first()
     )
+
+    # ========================================================
+    # UPDATE EXISTING CART ITEM
+    # ========================================================
 
     if existing_cart:
 
@@ -87,10 +108,30 @@ def add_to_cart(
             product.price * existing_cart.quantity
         )
 
+        # ====================================================
+        # WEBSOCKET - CART UPDATED
+        # ====================================================
+
+        await manager.send_to_user(
+            user_id,
+            {
+                "event": "cart_updated",
+                "action": "quantity_updated",
+                "message": "Your cart has been updated",
+                "cart_id": existing_cart.id,
+                "product_id": existing_cart.product_id,
+                "quantity": existing_cart.quantity
+            }
+        )
+
         return existing_cart
 
+    # ========================================================
+    # CREATE NEW CART ITEM
+    # ========================================================
+
     new_cart = Cart(
-        user_id=int(current_user),
+        user_id=user_id,
         product_id=cart_data.product_id,
         quantity=cart_data.quantity
     )
@@ -103,12 +144,24 @@ def add_to_cart(
         product.price * new_cart.quantity
     )
 
+    # ========================================================
+    # WEBSOCKET - CART UPDATED
+    # ========================================================
+
+    await manager.send_to_user(
+        user_id,
+        {
+            "event": "cart_updated",
+            "action": "item_added",
+            "message": "Product added to your cart",
+            "cart_id": new_cart.id,
+            "product_id": new_cart.product_id,
+            "quantity": new_cart.quantity
+        }
+    )
+
     return new_cart
 
-
-# ============================================================
-# GET CUSTOMER CART
-# ============================================================
 
 # ============================================================
 # GET CUSTOMER CART
@@ -123,10 +176,12 @@ def get_cart(
     current_user=Depends(get_current_user)
 ):
 
+    user_id = int(current_user)
+
     cart_items = (
         db.query(Cart)
         .filter(
-            Cart.user_id == int(current_user)
+            Cart.user_id == user_id
         )
         .all()
     )
@@ -155,18 +210,24 @@ def get_cart(
     "/{cart_id}",
     response_model=CartResponse
 )
-def update_cart(
+async def update_cart(
     cart_id: int,
     cart_data: CartUpdate,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
 
+    user_id = int(current_user)
+
+    # ========================================================
+    # FIND CART ITEM
+    # ========================================================
+
     cart_item = (
         db.query(Cart)
         .filter(
             Cart.id == cart_id,
-            Cart.user_id == int(current_user)
+            Cart.user_id == user_id
         )
         .first()
     )
@@ -176,6 +237,10 @@ def update_cart(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Cart item not found"
         )
+
+    # ========================================================
+    # FIND PRODUCT
+    # ========================================================
 
     product = (
         db.query(Product)
@@ -191,11 +256,19 @@ def update_cart(
             detail="Product not found"
         )
 
+    # ========================================================
+    # CHECK STOCK
+    # ========================================================
+
     if product.stock < cart_data.quantity:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Insufficient stock"
         )
+
+    # ========================================================
+    # UPDATE QUANTITY
+    # ========================================================
 
     cart_item.quantity = cart_data.quantity
 
@@ -204,6 +277,22 @@ def update_cart(
 
     cart_item.item_total = (
         product.price * cart_item.quantity
+    )
+
+    # ========================================================
+    # WEBSOCKET - CART UPDATED
+    # ========================================================
+
+    await manager.send_to_user(
+        user_id,
+        {
+            "event": "cart_updated",
+            "action": "quantity_updated",
+            "message": "Your cart quantity has been updated",
+            "cart_id": cart_item.id,
+            "product_id": cart_item.product_id,
+            "quantity": cart_item.quantity
+        }
     )
 
     return cart_item
@@ -216,17 +305,23 @@ def update_cart(
 @router.delete(
     "/{cart_id}"
 )
-def delete_cart_item(
+async def delete_cart_item(
     cart_id: int,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
 
+    user_id = int(current_user)
+
+    # ========================================================
+    # FIND CART ITEM
+    # ========================================================
+
     cart_item = (
         db.query(Cart)
         .filter(
             Cart.id == cart_id,
-            Cart.user_id == int(current_user)
+            Cart.user_id == user_id
         )
         .first()
     )
@@ -237,8 +332,32 @@ def delete_cart_item(
             detail="Cart item not found"
         )
 
+    # ========================================================
+    # SAVE CART ID BEFORE DELETE
+    # ========================================================
+
+    deleted_cart_id = cart_item.id
+
+    # ========================================================
+    # DELETE CART ITEM
+    # ========================================================
+
     db.delete(cart_item)
     db.commit()
+
+    # ========================================================
+    # WEBSOCKET - CART UPDATED
+    # ========================================================
+
+    await manager.send_to_user(
+        user_id,
+        {
+            "event": "cart_updated",
+            "action": "item_deleted",
+            "message": "An item was removed from your cart",
+            "cart_id": deleted_cart_id
+        }
+    )
 
     return {
         "message": "Cart item removed successfully"

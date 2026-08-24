@@ -1,19 +1,21 @@
 from fastapi import FastAPI  # type: ignore
-
 from app.core.database import Base, engine
-
 from app.models.user import User
 from app.models.product import Product
 from app.models.cart import Cart
 from app.models.order import Order
 from app.models.order_item import OrderItem
 from app.models.payment import Payment
+from app.models.notification import Notification
+
 
 from app.routes.auth import router as auth_router
 from app.routes.product import router as product_router
 from app.routes.cart import router as cart_router
 from app.routes.order import router as order_router
 from app.routes.payment import router as payment_router
+from app.routes.notification import router as notification_router # type: ignore
+from app.routes.websocket import router as websocket_router
 
 
 Base.metadata.create_all(bind=engine)
@@ -30,7 +32,8 @@ app.include_router(product_router)
 app.include_router(cart_router)
 app.include_router(order_router)
 app.include_router(payment_router)
-
+app.include_router(notification_router)
+app.include_router(websocket_router)
 
 @app.get("/")
 def home():

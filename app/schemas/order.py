@@ -42,3 +42,7 @@ class CheckoutResponse(BaseModel):
     payment_intent_id: str
     checkout_session_id: str
     checkout_url: str
+
+ # ORDER STATUS UPDATE
+
+class OrderStatusUpdate(BaseModel): status: str
