@@ -1,0 +1,436 @@
+{
+  "info": {
+    "name": "Ecommerce FastAPI API",
+    "description": "Postman collection for Ecommerce FastAPI backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000"
+    }
+  ],
+  "item": [
+    {
+      "name": "/auth/register",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/register",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "register"
+          ]
+        }
+      }
+    },
+    {
+      "name": "/auth/login",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/login",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "login"
+          ]
+        }
+      }
+    },
+    {
+      "name": "/auth/refresh",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/refresh",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "refresh"
+          ]
+        }
+      }
+    },
+    {
+      "name": "/auth/me",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/me",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "me"
+          ]
+        }
+      }
+    },
+    {
+      "name": "/auth/admin-test",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/admin-test",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "admin-test"
+          ]
+        }
+      }
+    },
+    {
+      "name": "/auth/staff-test",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/staff-test",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "staff-test"
+          ]
+        }
+      }
+    },
+    {
+      "name": "/auth/auth0/login",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/auth0/login",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "auth0",
+            "login"
+          ]
+        }
+      }
+    },
+    {
+      "name": "/products/",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/products/",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "products"
+          ]
+        }
+      }
+    },
+    {
+      "name": "/products/",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/products/",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "products"
+          ]
+        }
+      }
+    },
+    {
+      "name": "/products/category/{category}",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/products/category/{category}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "products",
+            "category",
+            "{category}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "/products/{product_id}",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/products/{product_id}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "products",
+            "{product_id}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "/products/{product_id}",
+      "request": {
+        "method": "PUT",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/products/{product_id}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "products",
+            "{product_id}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "/products/{product_id}",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/products/{product_id}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "products",
+            "{product_id}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "/cart/",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/cart/",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "cart"
+          ]
+        }
+      }
+    },
+    {
+      "name": "/cart/",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/cart/",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "cart"
+          ]
+        }
+      }
+    },
+    {
+      "name": "/cart/{cart_id}",
+      "request": {
+        "method": "PUT",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/cart/{cart_id}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "cart",
+            "{cart_id}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "/cart/{cart_id}",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/cart/{cart_id}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "cart",
+            "{cart_id}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "/orders/",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/orders/",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "orders"
+          ]
+        }
+      }
+    },
+    {
+      "name": "/orders/checkout",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/orders/checkout",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "orders",
+            "checkout"
+          ]
+        }
+      }
+    },
+    {
+      "name": "/orders/admin/all",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/orders/admin/all",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "orders",
+            "admin",
+            "all"
+          ]
+        }
+      }
+    },
+    {
+      "name": "/orders/admin/{order_id}/status",
+      "request": {
+        "method": "PUT",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/orders/admin/{order_id}/status",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "orders",
+            "admin",
+            "{order_id}",
+            "status"
+          ]
+        }
+      }
+    },
+    {
+      "name": "/payment/webhook",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/payment/webhook",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "payment",
+            "webhook"
+          ]
+        }
+      }
+    },
+    {
+      "name": "/notifications/",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/notifications/",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "notifications"
+          ]
+        }
+      }
+    },
+    {
+      "name": "/notifications/read",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/notifications/read",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "notifications",
+            "read"
+          ]
+        }
+      }
+    },
+    {
+      "name": "/",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": []
+        }
+      }
+    }
+  ]
+}

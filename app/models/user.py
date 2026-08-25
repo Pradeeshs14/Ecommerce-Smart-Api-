@@ -1,17 +1,29 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, Integer, String  # type: ignore
+from sqlalchemy import Boolean, Column, DateTime, Integer, String  # type: ignore
 from sqlalchemy.orm import relationship  # type: ignore
 
 from app.core.database import Base
 
 
+# ============================================================
+# USER MODEL
+# ============================================================
+
 class User(Base):
+
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
 
-    name = Column(String(100), nullable=False)
+    name = Column(
+        String(100),
+        nullable=False
+    )
 
     email = Column(
         String(150),
@@ -19,12 +31,26 @@ class User(Base):
         nullable=False
     )
 
-    password = Column(String(255), nullable=False)
+    password = Column(
+        String(255),
+        nullable=False
+    )
 
     role = Column(
         String(50),
         nullable=False,
         default="customer"
+    )
+
+    # ========================================================
+    # ACCOUNT STATUS
+    # Used by Admin Panel to activate/deactivate users
+    # ========================================================
+
+    is_active = Column(
+        Boolean,
+        nullable=False,
+        default=True
     )
 
     created_at = Column(
@@ -53,7 +79,7 @@ class User(Base):
         cascade="all, delete-orphan"
     )
 
-        # ============================================================
+    # ============================================================
     # NOTIFICATION RELATIONSHIP
     # ============================================================
 
