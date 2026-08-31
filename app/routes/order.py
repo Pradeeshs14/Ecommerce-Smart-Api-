@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import ( # type: ignore
     APIRouter,
@@ -6,7 +6,6 @@ from fastapi import ( # type: ignore
     HTTPException,
     status,
 )
-
 from sqlalchemy.orm import Session  # type: ignore
 
 import stripe  # type: ignore
@@ -26,11 +25,17 @@ from app.models.payment import Payment
 from app.models.product import Product
 from app.models.notification import Notification
 from app.models.user import User
+from app.models.return_request import ReturnRequest
 
 from app.schemas.order import (
     CheckoutResponse,
     OrderResponse,
     OrderStatusUpdate,
+)
+
+from app.schemas.return_request import (
+    ReturnRequestCreate,
+    ReturnRequestResponse,
 )
 
 from app.services.websocket_manager import manager
@@ -44,12 +49,12 @@ stripe.api_key = STRIPE_SECRET_KEY
 
 print(
     "STRIPE KEY PREFIX:",
-    STRIPE_SECRET_KEY[:8]
+    STRIPE_SECRET_KEY[:8] if STRIPE_SECRET_KEY else "NOT CONFIGURED"
 )
 
 print(
     "STRIPE KEY LENGTH:",
-    len(STRIPE_SECRET_KEY)
+    len(STRIPE_SECRET_KEY) if STRIPE_SECRET_KEY else 0
 )
 
 
@@ -75,7 +80,6 @@ def get_customer_orders(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-
     user_id = int(current_user)
 
     orders = (
@@ -105,7 +109,6 @@ def checkout(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-
     user_id = int(current_user)
 
     # ========================================================
@@ -113,7 +116,6 @@ def checkout(
     # ========================================================
 
     if not STRIPE_SECRET_KEY:
-
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Stripe is not configured"
@@ -132,7 +134,6 @@ def checkout(
     )
 
     if not cart_items:
-
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cart is empty"
@@ -156,14 +157,12 @@ def checkout(
         )
 
         if not product:
-
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Product not found"
             )
 
         if product.stock < cart_item.quantity:
-
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=(
@@ -201,7 +200,6 @@ def checkout(
     )
 
     db.add(new_order)
-
     db.flush()
 
     # ========================================================
@@ -233,11 +231,8 @@ def checkout(
         # ----------------------------------------------------
 
         payment_intent = stripe.PaymentIntent.create(
-
             amount=amount_in_cents,
-
             currency="inr",
-
             metadata={
                 "order_id": str(new_order.id),
                 "user_id": str(user_id)
@@ -259,7 +254,6 @@ def checkout(
             line_items=[
                 {
                     "price_data": {
-
                         "currency": "inr",
 
                         "product_data": {
@@ -268,8 +262,7 @@ def checkout(
                             )
                         },
 
-                        "unit_amount":
-                            amount_in_cents
+                        "unit_amount": amount_in_cents
                     },
 
                     "quantity": 1
@@ -340,7 +333,6 @@ def checkout(
     # ========================================================
 
     for cart_item in cart_items:
-
         db.delete(cart_item)
 
     # ========================================================
@@ -370,17 +362,11 @@ def checkout(
     # ========================================================
 
     return CheckoutResponse(
-
         order_id=new_order.id,
-
         total_amount=new_order.total_amount,
-
         payment_status=new_order.payment_status,
-
         payment_intent_id=payment_intent.id,
-
         checkout_session_id=checkout_session.id,
-
         checkout_url=checkout_session.url
     )
 
@@ -504,21 +490,25 @@ async def update_order_status(
     order.status = new_status
 
     # ========================================================
+    # SAVE DELIVERY DATE
+    # ========================================================
+
+    if new_status == "delivered":
+
+        order.delivered_at = datetime.utcnow()
+
+    # ========================================================
     # CREATE NOTIFICATION
     # ========================================================
 
     notification = Notification(
-
         user_id=order.user_id,
-
         type="order_status_updated",
-
         message=(
             f"Your Order #{order.id} "
             f"status has been updated "
             f"to {new_status}"
         ),
-
         read_status="unread"
     )
 
@@ -531,7 +521,6 @@ async def update_order_status(
     try:
 
         db.commit()
-
         db.refresh(order)
 
     except Exception as exc:
@@ -553,9 +542,7 @@ async def update_order_status(
     try:
 
         await manager.send_to_user(
-
             order.user_id,
-
             {
                 "event":
                     "order_status_updated",
@@ -664,3 +651,435 @@ Smart E-Commerce Team
     # ========================================================
 
     return order
+
+
+# ============================================================
+# CUSTOMER - REQUEST RETURN
+# ============================================================
+
+@router.post(
+    "/{order_id}/return",
+    response_model=ReturnRequestResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def request_return(
+    order_id: int,
+    return_data: ReturnRequestCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+
+    user_id = int(current_user)
+
+    # ========================================================
+    # FIND CUSTOMER ORDER
+    # ========================================================
+
+    order = (
+        db.query(Order)
+        .filter(
+            Order.id == order_id,
+            Order.user_id == user_id,
+        )
+        .first()
+    )
+
+    if not order:
+
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order not found",
+        )
+
+    # ========================================================
+    # CHECK ORDER STATUS
+    # ========================================================
+
+    if order.status.lower() != "delivered":
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Return can only be requested "
+                "for delivered orders"
+            ),
+        )
+
+    # ========================================================
+    # CHECK DELIVERY DATE
+    # ========================================================
+
+    if not order.delivered_at:
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Delivery date is not available",
+        )
+
+    # ========================================================
+    # CHECK RETURN WINDOW
+    # ========================================================
+
+    return_deadline = (
+        order.delivered_at +
+        timedelta(days=7)
+    )
+
+    if datetime.utcnow() > return_deadline:
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Return window has expired",
+        )
+
+    # ========================================================
+    # CHECK EXISTING RETURN REQUEST
+    # ========================================================
+
+    existing_request = (
+        db.query(ReturnRequest)
+        .filter(
+            ReturnRequest.order_id == order_id,
+            ReturnRequest.user_id == user_id,
+        )
+        .first()
+    )
+
+    if existing_request:
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Return request already exists "
+                "for this order"
+            ),
+        )
+
+    # ========================================================
+    # CREATE RETURN REQUEST
+    # ========================================================
+
+    return_request = ReturnRequest(
+        order_id=order_id,
+        user_id=user_id,
+        reason=return_data.reason,
+        comment=return_data.comment,
+        status="pending",
+    )
+
+    db.add(return_request)
+
+    # ========================================================
+    # UPDATE ORDER STATUS
+    # ========================================================
+
+    order.status = "return_requested"
+
+    # ========================================================
+    # CREATE CUSTOMER NOTIFICATION
+    # ========================================================
+
+    notification = Notification(
+        user_id=user_id,
+        type="return_requested",
+        message=(
+            f"Return request submitted "
+            f"for Order #{order.id}"
+        ),
+        read_status="unread"
+    )
+
+    db.add(notification)
+
+    # ========================================================
+    # SAVE DATABASE CHANGES
+    # ========================================================
+
+    try:
+
+        db.commit()
+        db.refresh(return_request)
+
+    except Exception as exc:
+
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Failed to create return request: "
+                f"{str(exc)}"
+            ),
+        )
+
+    # ========================================================
+    # RETURN RESPONSE
+    # ========================================================
+
+    return return_request
+
+
+# ============================================================
+# ADMIN - GET ALL RETURN REQUESTS
+# ============================================================
+
+@router.get(
+    "/admin/returns",
+    response_model=list[ReturnRequestResponse]
+)
+def get_all_return_requests(
+    db: Session = Depends(get_db),
+    current_user=Depends(
+        require_role("admin")
+    ),
+):
+
+    return_requests = (
+        db.query(ReturnRequest)
+        .order_by(
+            ReturnRequest.created_at.desc()
+        )
+        .all()
+    )
+
+    return return_requests
+
+
+# ============================================================
+# ADMIN - APPROVE RETURN REQUEST
+# ============================================================
+
+@router.put(
+    "/admin/returns/{return_id}/approve",
+    response_model=ReturnRequestResponse,
+)
+def approve_return_request(
+    return_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(
+        require_role("admin")
+    ),
+):
+
+    # ========================================================
+    # FIND RETURN REQUEST
+    # ========================================================
+
+    return_request = (
+        db.query(ReturnRequest)
+        .filter(
+            ReturnRequest.id == return_id
+        )
+        .first()
+    )
+
+    if not return_request:
+
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Return request not found",
+        )
+
+    # ========================================================
+    # CHECK CURRENT STATUS
+    # ========================================================
+
+    if return_request.status != "pending":
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Return request is already "
+                f"{return_request.status}"
+            ),
+        )
+
+    # ========================================================
+    # FIND ORDER
+    # ========================================================
+
+    order = (
+        db.query(Order)
+        .filter(
+            Order.id == return_request.order_id
+        )
+        .first()
+    )
+
+    if not order:
+
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order not found",
+        )
+
+    # ========================================================
+    # UPDATE RETURN STATUS
+    # ========================================================
+
+    return_request.status = "approved"
+
+    # ========================================================
+    # UPDATE ORDER STATUS
+    # ========================================================
+
+    order.status = "return_approved"
+
+    # ========================================================
+    # CUSTOMER NOTIFICATION
+    # ========================================================
+
+    notification = Notification(
+        user_id=return_request.user_id,
+        type="return_approved",
+        message=(
+            f"Your return request for "
+            f"Order #{order.id} has been approved"
+        ),
+        read_status="unread"
+    )
+
+    db.add(notification)
+
+    # ========================================================
+    # SAVE CHANGES
+    # ========================================================
+
+    try:
+
+        db.commit()
+        db.refresh(return_request)
+
+    except Exception as exc:
+
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Failed to approve return request: "
+                f"{str(exc)}"
+            ),
+        )
+
+    return return_request
+
+
+# ============================================================
+# ADMIN - REJECT RETURN REQUEST
+# ============================================================
+
+@router.put(
+    "/admin/returns/{return_id}/reject",
+    response_model=ReturnRequestResponse,
+)
+def reject_return_request(
+    return_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(
+        require_role("admin")
+    ),
+):
+
+    # ========================================================
+    # FIND RETURN REQUEST
+    # ========================================================
+
+    return_request = (
+        db.query(ReturnRequest)
+        .filter(
+            ReturnRequest.id == return_id
+        )
+        .first()
+    )
+
+    if not return_request:
+
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Return request not found",
+        )
+
+    # ========================================================
+    # CHECK CURRENT STATUS
+    # ========================================================
+
+    if return_request.status != "pending":
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Return request is already "
+                f"{return_request.status}"
+            ),
+        )
+
+    # ========================================================
+    # FIND ORDER
+    # ========================================================
+
+    order = (
+        db.query(Order)
+        .filter(
+            Order.id == return_request.order_id
+        )
+        .first()
+    )
+
+    if not order:
+
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order not found",
+        )
+
+    # ========================================================
+    # UPDATE RETURN STATUS
+    # ========================================================
+
+    return_request.status = "rejected"
+
+    # ========================================================
+    # UPDATE ORDER STATUS
+    # ========================================================
+
+    order.status = "return_rejected"
+
+    # ========================================================
+    # CUSTOMER NOTIFICATION
+    # ========================================================
+
+    notification = Notification(
+        user_id=return_request.user_id,
+        type="return_rejected",
+        message=(
+            f"Your return request for "
+            f"Order #{order.id} has been rejected"
+        ),
+        read_status="unread"
+    )
+
+    db.add(notification)
+
+    # ========================================================
+    # SAVE CHANGES
+    # ========================================================
+
+    try:
+
+        db.commit()
+        db.refresh(return_request)
+
+    except Exception as exc:
+
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Failed to reject return request: "
+                f"{str(exc)}"
+            ),
+        )
+
+    return return_request

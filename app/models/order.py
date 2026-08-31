@@ -49,6 +49,10 @@ class Order(Base):
         nullable=False
     )
 
+    delivered_at = Column(
+        DateTime,
+        nullable=True
+    )
     # ========================================================
     # USER RELATIONSHIP
     # ========================================================
@@ -76,5 +80,15 @@ class Order(Base):
         "Payment",
         back_populates="order",
         uselist=False,
+        cascade="all, delete-orphan"
+    )
+
+    # ========================================================
+    # RETURN REQUEST RELATIONSHIP
+    # ========================================================
+
+    return_requests = relationship(
+        "ReturnRequest",
+        back_populates="order",
         cascade="all, delete-orphan"
     )
