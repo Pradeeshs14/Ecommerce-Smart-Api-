@@ -27,6 +27,7 @@ class OrderResponse(BaseModel):
     status: str
     payment_status: str
     created_at: datetime
+    delivered_at: datetime | None = None
     items: list[OrderItemResponse]
 
 
@@ -43,6 +44,11 @@ class CheckoutResponse(BaseModel):
     checkout_session_id: str
     checkout_url: str
 
- # ORDER STATUS UPDATE
 
-class OrderStatusUpdate(BaseModel): status: str
+# ============================================================
+# ORDER STATUS UPDATE
+# ============================================================
+
+class OrderStatusUpdate(BaseModel):
+
+    status: str

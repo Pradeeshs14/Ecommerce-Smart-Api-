@@ -5,7 +5,8 @@ from fastapi import ( # type: ignore
     Depends,
     HTTPException,
     status,
-)
+)  # type: ignore
+
 from sqlalchemy.orm import Session  # type: ignore
 
 import stripe  # type: ignore
@@ -494,7 +495,6 @@ async def update_order_status(
     # ========================================================
 
     if new_status == "delivered":
-
         order.delivered_at = datetime.utcnow()
 
     # ========================================================
@@ -544,27 +544,21 @@ async def update_order_status(
         await manager.send_to_user(
             order.user_id,
             {
-                "event":
-                    "order_status_updated",
+                "event": "order_status_updated",
 
-                "order_id":
-                    order.id,
+                "order_id": order.id,
 
-                "old_status":
-                    old_status,
+                "old_status": old_status,
 
-                "status":
-                    new_status,
+                "status": new_status,
 
-                "payment_status":
-                    order.payment_status,
+                "payment_status": order.payment_status,
 
-                "message":
-                    (
-                        f"Your Order #{order.id} "
-                        f"has been updated to "
-                        f"{new_status}"
-                    )
+                "message": (
+                    f"Your Order #{order.id} "
+                    f"has been updated to "
+                    f"{new_status}"
+                )
             }
         )
 
