@@ -26,6 +26,7 @@ class OrderResponse(BaseModel):
     total_amount: float
     status: str
     payment_status: str
+    payment_intent_id: str | None = None
     created_at: datetime
     delivered_at: datetime | None = None
     items: list[OrderItemResponse]
@@ -40,7 +41,7 @@ class CheckoutResponse(BaseModel):
     order_id: int
     total_amount: float
     payment_status: str
-    payment_intent_id: str
+    payment_intent_id: str | None = None
     checkout_session_id: str
     checkout_url: str
 

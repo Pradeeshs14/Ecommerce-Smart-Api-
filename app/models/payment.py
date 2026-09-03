@@ -1,6 +1,14 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String  # type: ignore
+from sqlalchemy import ( # type: ignore
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+)  # type: ignore
+
 from sqlalchemy.orm import relationship  # type: ignore
 
 from app.core.database import Base
@@ -14,10 +22,14 @@ class Payment(Base):
 
     __tablename__ = "payments"
 
+    # ========================================================
+    # PRIMARY KEY
+    # ========================================================
+
     id = Column(
         Integer,
         primary_key=True,
-        index=True
+        index=True,
     )
 
     # ========================================================
@@ -28,7 +40,7 @@ class Payment(Base):
         Integer,
         ForeignKey("orders.id"),
         nullable=False,
-        unique=True
+        unique=True,
     )
 
     # ========================================================
@@ -37,47 +49,72 @@ class Payment(Base):
 
     amount = Column(
         Float,
-        nullable=False
+        nullable=False,
     )
 
     # ========================================================
-    # REQUIRED PAYMENT TRACKING FIELDS
+    # PAYMENT METHOD
     # ========================================================
 
     payment_method = Column(
         String(50),
-        nullable=True
+        nullable=True,
     )
+
+    # ========================================================
+    # TRANSACTION ID
+    # ========================================================
 
     transaction_id = Column(
         String(255),
-        nullable=True
+        nullable=True,
     )
+
+    # ========================================================
+    # PAYMENT STATUS
+    # ========================================================
 
     status = Column(
         String(50),
         nullable=False,
-        default="pending"
+        default="pending",
     )
+
+    # ========================================================
+    # PAYMENT TIMESTAMP
+    # ========================================================
 
     timestamp = Column(
         DateTime,
         default=datetime.utcnow,
-        nullable=False
+        nullable=False,
     )
 
     # ========================================================
-    # STRIPE TRACKING
+    # STRIPE PAYMENT INTENT
     # ========================================================
 
     payment_intent_id = Column(
         String(255),
-        nullable=True
+        nullable=True,
     )
+
+    # ========================================================
+    # STRIPE CHECKOUT SESSION
+    # ========================================================
 
     checkout_session_id = Column(
         String(255),
-        nullable=True
+        nullable=True,
+    )
+
+    # ========================================================
+    # STRIPE REFUND ID
+    # ========================================================
+
+    refund_id = Column(
+        String(255),
+        nullable=True,
     )
 
     # ========================================================
@@ -86,5 +123,5 @@ class Payment(Base):
 
     order = relationship(
         "Order",
-        back_populates="payment"
+        back_populates="payment",
     )

@@ -8,7 +8,7 @@ import requests  # type: ignore
 import jwt  # type: ignore
 from dotenv import load_dotenv  # type: ignore
 from fastapi import Depends, HTTPException, status  # type: ignore
-from fastapi.security import (
+from fastapi.security import ( # type: ignore
     HTTPAuthorizationCredentials,
     HTTPBearer,
 )

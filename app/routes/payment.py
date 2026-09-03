@@ -70,15 +70,12 @@ async def stripe_webhook(
     # ========================================================
 
     if not signature:
-
         raise HTTPException(
             status_code=400,
             detail="Missing Stripe signature"
         )
 
-
     if not STRIPE_WEBHOOK_SECRET:
-
         raise HTTPException(
             status_code=500,
             detail="Stripe webhook secret is not configured"
@@ -150,12 +147,10 @@ async def stripe_webhook(
 
         print("\n====================================")
         print("CHECKOUT SESSION COMPLETED")
-
         print(
             "Session ID:",
             checkout_session_id
         )
-
         print("====================================")
 
 
@@ -277,7 +272,51 @@ async def stripe_webhook(
             # UPDATE PAYMENT
             # ==================================================
 
+            print(
+                "DEBUG 1: Before reading payment_intent"
+            )
+
+
+            payment_intent_id = session.payment_intent
+
+
+            print(
+                "DEBUG 2: PaymentIntent ID:",
+                payment_intent_id
+            )
+
+
+            if payment_intent_id:
+
+                payment.payment_intent_id = (
+                    payment_intent_id
+                )
+
+                print(
+                    "DEBUG 3: payment_intent_id assigned"
+                )
+
+                payment.transaction_id = (
+                    payment_intent_id
+                )
+
+                print(
+                    "DEBUG 4: transaction_id assigned"
+                )
+
+            else:
+
+                print(
+                    "WARNING: PaymentIntent ID not available in Checkout Session"
+                )
+
+
             payment.status = "paid"
+
+
+            print(
+                "DEBUG 5: payment status assigned"
+            )
 
 
             # ==================================================
@@ -287,6 +326,11 @@ async def stripe_webhook(
             order.payment_status = "paid"
 
             order.status = "confirmed"
+
+
+            print(
+                "Order object updated"
+            )
 
 
             # ==================================================
@@ -306,6 +350,7 @@ async def stripe_webhook(
 
                 read_status="unread"
             )
+
 
             db.add(
                 payment_notification
@@ -329,6 +374,7 @@ async def stripe_webhook(
 
                 read_status="unread"
             )
+
 
             db.add(
                 order_notification
@@ -389,9 +435,11 @@ async def stripe_webhook(
                     }
                 )
 
+
                 print(
                     "Real-time payment notification sent"
                 )
+
 
             except Exception as websocket_exc:
 
@@ -412,13 +460,17 @@ async def stripe_webhook(
                     user.id,
 
                     {
-                        "event": "order_status_updated",
+                        "event":
+                        "order_status_updated",
 
-                        "order_id": order.id,
+                        "order_id":
+                        order.id,
 
-                        "status": "confirmed",
+                        "status":
+                        "confirmed",
 
-                        "payment_status": "paid",
+                        "payment_status":
+                        "paid",
 
                         "message": (
                             f"Your Order #{order.id} "
@@ -427,9 +479,11 @@ async def stripe_webhook(
                     }
                 )
 
+
                 print(
                     "Real-time order notification sent"
                 )
+
 
             except Exception as websocket_exc:
 
@@ -440,36 +494,32 @@ async def stripe_webhook(
 
 
             # ==================================================
-            # SEND CONFIRMATION EMAIL
+            # SEND ORDER PLACED + PAYMENT CONFIRMED EMAIL
             # ==================================================
 
             try:
 
                 email_subject = (
-                    f"Order #{order.id} Confirmed - "
-                    f"Smart E-Commerce"
+                    f"Order Placed & Payment Confirmed "
+                    f"- Order #{order.id}"
                 )
 
 
                 email_body = f"""
 Hello {user.name},
 
-Your payment has been successfully received.
+Your order has been placed successfully and your payment has been confirmed.
 
 Order Details
 ------------------------------
-
 Order ID: #{order.id}
-
 Amount Paid: ₹{order.total_amount:.2f}
-
 Payment Status: Paid
-
 Order Status: Confirmed
 
-Thank you for shopping with Smart E-Commerce.
+Your order is now being processed.
 
-Your order is now confirmed and will be processed shortly.
+Thank you for shopping with Smart E-Commerce!
 
 Regards,
 
@@ -488,26 +538,36 @@ Smart E-Commerce Team
 
 
                 print(
-                    "Confirmation email sent successfully"
+                    "Order placed confirmation email sent successfully"
                 )
 
 
             except Exception as email_exc:
 
                 print(
-                    "EMAIL ERROR:",
+                    "ORDER PLACED EMAIL ERROR:",
                     repr(email_exc)
                 )
 
 
+            # ==================================================
+            # WEBHOOK SUCCESS
+            # ==================================================
+
             print(
-                "Payment processing completed successfully"
+                "Webhook processing completed successfully"
             )
+
+
+            return {
+                "status": "success"
+            }
 
 
         except Exception as exc:
 
             db.rollback()
+
 
             print(
                 "\n===================================="
@@ -526,12 +586,10 @@ Smart E-Commerce Team
                 "===================================="
             )
 
+
             raise HTTPException(
                 status_code=500,
-                detail=(
-                    f"Webhook database error: "
-                    f"{str(exc)}"
-                )
+                detail="Webhook processing failed"
             )
 
 
@@ -541,9 +599,25 @@ Smart E-Commerce Team
 
     elif event_type == "payment_intent.succeeded":
 
+        payment_intent = event["data"]["object"]
+
+        payment_intent_id = payment_intent["id"]
+
+
         print(
-            "PaymentIntent succeeded"
+            "PaymentIntent succeeded:",
+            payment_intent_id
         )
+
+
+        print(
+            "Webhook processing completed successfully"
+        )
+
+
+        return {
+            "status": "success"
+        }
 
 
     # ========================================================
@@ -552,9 +626,23 @@ Smart E-Commerce Team
 
     elif event_type == "payment_intent.created":
 
+        payment_intent = event["data"]["object"]
+
+
         print(
-            "PaymentIntent created"
+            "PaymentIntent created:",
+            payment_intent["id"]
         )
+
+
+        print(
+            "Webhook processing completed successfully"
+        )
+
+
+        return {
+            "status": "success"
+        }
 
 
     # ========================================================
@@ -567,22 +655,14 @@ Smart E-Commerce Team
 
         payment_intent_id = payment_intent["id"]
 
-        print("\n====================================")
-        print("PAYMENT INTENT PAYMENT FAILED")
 
         print(
-            "PaymentIntent ID:",
+            "PaymentIntent failed:",
             payment_intent_id
         )
 
-        print("====================================")
-
 
         try:
-
-            # ==================================================
-            # FIND PAYMENT
-            # ==================================================
 
             payment = (
                 db.query(Payment)
@@ -594,358 +674,83 @@ Smart E-Commerce Team
             )
 
 
-            if not payment:
+            if payment:
 
-                print(
-                    "WARNING: Payment record not found"
-                )
-
-                return {
-                    "status": "success"
-                }
+                payment.status = "failed"
 
 
-            print(
-                "Payment ID:",
-                payment.id
-            )
-
-
-            # ==================================================
-            # IDEMPOTENCY CHECK
-            # ==================================================
-
-            if payment.status == "failed":
-
-                print(
-                    "Payment already marked as FAILED"
-                )
-
-                return {
-                    "status": "success",
-                    "message": "Payment failure already processed"
-                }
-
-
-            # ==================================================
-            # FIND ORDER
-            # ==================================================
-
-            order = (
-                db.query(Order)
-                .filter(
-                    Order.id == payment.order_id
-                )
-                .first()
-            )
-
-
-            if not order:
-
-                print(
-                    "WARNING: Order not found"
-                )
-
-                return {
-                    "status": "success"
-                }
-
-
-            # ==================================================
-            # FIND USER
-            # ==================================================
-
-            user = (
-                db.query(User)
-                .filter(
-                    User.id == order.user_id
-                )
-                .first()
-            )
-
-
-            if not user:
-
-                print(
-                    "WARNING: User not found"
-                )
-
-                return {
-                    "status": "success"
-                }
-
-
-            print(
-                "Customer email:",
-                user.email
-            )
-
-
-            # ==================================================
-            # GET FAILURE MESSAGE
-            # ==================================================
-
-            last_payment_error = (
-                payment_intent.get(
-                    "last_payment_error"
-                )
-            )
-
-
-            failure_message = (
-                "Payment failed"
-            )
-
-
-            if last_payment_error:
-
-                failure_message = (
-                    last_payment_error.get(
-                        "message",
-                        "Payment failed"
+                order = (
+                    db.query(Order)
+                    .filter(
+                        Order.id == payment.order_id
                     )
+                    .first()
                 )
 
 
-            # ==================================================
-            # UPDATE PAYMENT
-            # ==================================================
+                if order:
 
-            payment.status = "failed"
+                    order.payment_status = "failed"
 
 
-            # ==================================================
-            # UPDATE ORDER
-            # ==================================================
-
-            order.payment_status = "failed"
-
-            order.status = "payment_failed"
-
-
-            # ==================================================
-            # CREATE PAYMENT FAILURE NOTIFICATION
-            # ==================================================
-
-            notification = Notification(
-
-                user_id=user.id,
-
-                type="payment_failed",
-
-                message=(
-                    f"Payment failed for "
-                    f"Order #{order.id}. "
-                    f"{failure_message}"
-                ),
-
-                read_status="unread"
-            )
-
-            db.add(notification)
-
-
-            # ==================================================
-            # COMMIT DATABASE CHANGES
-            # ==================================================
-
-            db.commit()
-
-
-            print(
-                "Payment status updated to FAILED"
-            )
-
-            print(
-                "Order payment status updated to FAILED"
-            )
-
-            print(
-                "Order status updated to PAYMENT_FAILED"
-            )
-
-            print(
-                "Payment failure notification created"
-            )
-
-
-            # ==================================================
-            # REAL-TIME PAYMENT FAILURE
-            # ==================================================
-
-            try:
-
-                await manager.send_to_user(
-
-                    user.id,
-
-                    {
-                        "event": "payment_failed",
-
-                        "order_id": order.id,
-
-                        "payment_id": payment.id,
-
-                        "payment_status": "failed",
-
-                        "message": (
-                            f"Payment failed for "
-                            f"Order #{order.id}"
+                    user = (
+                        db.query(User)
+                        .filter(
+                            User.id == order.user_id
                         )
-                    }
-                )
+                        .first()
+                    )
 
 
-                print(
-                    "Real-time payment failure notification sent"
-                )
+                    if user:
 
+                        notification = Notification(
 
-            except Exception as websocket_exc:
+                            user_id=user.id,
 
-                print(
-                    "WEBSOCKET PAYMENT FAILURE ERROR:",
-                    repr(websocket_exc)
-                )
+                            type="payment_failed",
 
+                            message=(
+                                f"Payment failed for "
+                                f"Order #{order.id}"
+                            ),
 
-            # ==================================================
-            # REAL-TIME ORDER UPDATE
-            # ==================================================
-
-            try:
-
-                await manager.send_to_user(
-
-                    user.id,
-
-                    {
-                        "event": "order_status_updated",
-
-                        "order_id": order.id,
-
-                        "status": "payment_failed",
-
-                        "payment_status": "failed",
-
-                        "message": (
-                            f"Payment failed for "
-                            f"Order #{order.id}"
+                            read_status="unread"
                         )
-                    }
-                )
 
 
-                print(
-                    "Real-time failed order notification sent"
-                )
+                        db.add(
+                            notification
+                        )
 
 
-            except Exception as websocket_exc:
-
-                print(
-                    "WEBSOCKET ORDER FAILURE ERROR:",
-                    repr(websocket_exc)
-                )
-
-
-            # ==================================================
-            # SEND PAYMENT FAILURE EMAIL
-            # ==================================================
-
-            try:
-
-                email_subject = (
-                    f"Payment Failed - "
-                    f"Order #{order.id}"
-                )
-
-
-                email_body = f"""
-Hello {user.name},
-
-Unfortunately, your payment could not be completed.
-
-Order Details
-------------------------------
-
-Order ID: #{order.id}
-
-Amount: ₹{order.total_amount:.2f}
-
-Payment Status: Failed
-
-Order Status: Payment Failed
-
-Reason:
-{failure_message}
-
-Please try the payment again.
-
-If the amount was deducted from your account,
-please contact our support team.
-
-Regards,
-
-Smart E-Commerce Team
-"""
-
-
-                await send_email(
-
-                    recipient=user.email,
-
-                    subject=email_subject,
-
-                    body=email_body
-                )
-
-
-                print(
-                    "Payment failure email sent successfully"
-                )
-
-
-            except Exception as email_exc:
-
-                print(
-                    "PAYMENT FAILURE EMAIL ERROR:",
-                    repr(email_exc)
-                )
+                db.commit()
 
 
             print(
-                "Payment failure processing completed successfully"
+                "Payment failure processed successfully"
             )
+
+
+            return {
+                "status": "success"
+            }
 
 
         except Exception as exc:
 
             db.rollback()
 
-            print(
-                "\n===================================="
-            )
 
             print(
-                "PAYMENT FAILURE DATABASE ERROR"
-            )
-
-            print(
-                "ERROR:",
+                "PAYMENT FAILED WEBHOOK ERROR:",
                 repr(exc)
             )
 
-            print(
-                "===================================="
-            )
 
             raise HTTPException(
                 status_code=500,
-                detail=(
-                    f"Payment failure processing error: "
-                    f"{str(exc)}"
-                )
+                detail="Payment failure processing failed"
             )
 
 
@@ -955,9 +760,23 @@ Smart E-Commerce Team
 
     elif event_type == "charge.succeeded":
 
+        charge = event["data"]["object"]
+
+
         print(
-            "Charge succeeded"
+            "Charge succeeded:",
+            charge["id"]
         )
+
+
+        print(
+            "Webhook processing completed successfully"
+        )
+
+
+        return {
+            "status": "success"
+        }
 
 
     # ========================================================
@@ -966,13 +785,27 @@ Smart E-Commerce Team
 
     elif event_type == "charge.updated":
 
+        charge = event["data"]["object"]
+
+
         print(
-            "Charge updated"
+            "Charge updated:",
+            charge["id"]
         )
 
 
+        print(
+            "Webhook processing completed successfully"
+        )
+
+
+        return {
+            "status": "success"
+        }
+
+
     # ========================================================
-    # OTHER EVENTS
+    # UNHANDLED EVENT
     # ========================================================
 
     else:
@@ -983,15 +816,12 @@ Smart E-Commerce Team
         )
 
 
-    # ========================================================
-    # RESPONSE
-    # ========================================================
+        print(
+            "Webhook processing completed successfully"
+        )
 
-    print(
-        "Webhook processing completed successfully"
-    )
 
-    return {
-        "status": "success"
-    }
+        return {
+            "status": "success"
+        }
 
